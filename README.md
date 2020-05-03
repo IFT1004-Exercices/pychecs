@@ -7,17 +7,17 @@ Pychecs est un projet d'interface graphique en python pour jouer aux échecs.
 La version actuelle du programme est démarrée en exécutant __main__.py à-partir du dossier /pychecs.
 Les librairies suivantes sont requises:
 
-tkinter
-hashlib
-json
-time
-sys
+tkinter,
+hashlib,
+json,
+time,
+sys,
 os
 
 ## Fonctionnalités actuelles
 
 On peut jouer contre l'ordinateur ou contre un adversaire humain sur le même écran.  Le moteur d'échec
-employé est sunfish, sous licence GNU GPL par Daniel Ahle, un moteur remarquable par sa légèreté.
+employé est [sunfish](https://github.com/thomasahle/sunfish), sous licence GNU GPL par Daniel Ahle, un moteur remarquable par sa légèreté.
 
 Toutes les règles des échecs sont respectées, et l'interface détecte les mats, pats, mises en échec,
 ainsi que la promotion du pion.  Si l'utilisateur le désire, l'interface peut indiquer les mouvements
@@ -27,9 +27,8 @@ Les coups peuvent être annulés en cascade jusqu'au début des parties.
 
 ## Fonctionnalités futures ou souhaitées
 
-Affichage des pièces prises
-Drag and drop
-Mouvements animés des pièces avec sons
+Affichage des pièces prises, drag and drop, mouvements animés des pièces avec sons.
+
 Possibilité de configurer l'interface avec des thèmes
 
 ## Le jeu en réseau est le but ultime du projet:
@@ -48,7 +47,7 @@ Pascal Charpentier
 
 ## Remerciements
 
-Daniel Ahle pour sunfish
+Daniel Ahle pour [sunfish](https://github.com/thomasahle/sunfish)
 
 ## Droits
 
