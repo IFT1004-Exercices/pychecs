@@ -21,6 +21,7 @@ class FenetreChoixPromotion(tk.Toplevel):
 
     Attributs:
 
+    master(widget):  Widget maître, un Canvasechiquier
     code_piece_choisie(StringVar):  Contiendra le choix du joueur
     couleur (StringVar): La couleur de la pièce"""
 
@@ -82,6 +83,7 @@ class FenetreChoixPromotion(tk.Toplevel):
         self.grab_set()
 
     def disparaitre(self):
+        """Remettre l'échiquier en mode actif avant de disparaître"""
         self.master.passer_en_mode_actif()
         self.destroy()
 
@@ -100,7 +102,7 @@ class FenetreChoixPromotion(tk.Toplevel):
         self.bouton_ok.config(state=tk.ACTIVE)
 
     def apparaitre(self):
-        """Fonction interface avec laquelle on invoque la fenêtre."""
+        """Fonction interface avec laquelle on invoque la fenêtre.  Sera appelée par le maître."""
 
         self.deiconify()
         self.wait_window()

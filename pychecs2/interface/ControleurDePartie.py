@@ -246,9 +246,11 @@ Interrompre:  abandonner, suspendre ou charger une nouvelle partie."""
         partie est terminée."""
 
         if self.echiquier_graphique.message.get().startswith("C'est"):
+            print("Débuter le chrono")
             self.chrono.debuter()
         else:
             # TODO Bug à arranger:  ça n'arrête pas.
+            print("Arrêter le chrono")
             self.chrono.arreter()
 
     def fenetre_est_fermee(self):

@@ -27,6 +27,7 @@ class Chronometre(Label):
         if not self.nobutton:
             self.bou.config(text="Pause", command=self.arreter)
         self.debut = time()
+        self.marche=True
         self.tic()
 
     def mise_a_jour(self, duree):
@@ -38,14 +39,18 @@ class Chronometre(Label):
             self.alarme()
 
     def tic(self):
+
         self.ecoule = time() - self.debut
-        self.marche = self.after(1000, self.tic)
+        afterId = self.after(1000, self.tic)
         self.mise_a_jour(self.temps - self.ecoule)
+        if not self.marche:
+            self.after_cancel(afterId)
 
     def continuer(self):
         t_offset = time() - self.t_arret
         self.debut += t_offset
         self.bou.config(text="Pause", command=self.arreter)
+        self.marche=True
         self.tic()
 
 
@@ -53,8 +58,7 @@ class Chronometre(Label):
         self.t_arret = time()
         if not self.nobutton:
             self.bou.config(text="Continuer", command=self.continuer)
-        self.after_cancel(self.marche)
-        #self.destroy()
+        self.marche=False
 
     def alarme(self):
         self.duree_affichee.set(self.texte_initial + self.texte_alarme)

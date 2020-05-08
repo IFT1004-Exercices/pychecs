@@ -27,6 +27,15 @@ class Echiquier:
     # Permet de basculer facilement les couleurs
     couleurs = {"blanc": "noir", "noir": "blanc"}
 
+    # Mouvements de la tour pour le roque
+    roques = {("e1", "c1"): ("grand roque", "blanc", "a1"), ("e1", "g1"): ("petit roque", "blanc", "h1"),
+              ("e8", "c8"): ("grand roque", "noir", "a8"), ("e8", "g8"): ("petit roque", "noir", "h8")}
+
+    # Cases où le pion peut sauter pour la prise en passant
+    pion_peut_sauter_vers = {"blanc": ["a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4"],
+                                  "noir": ["a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5"]}
+
+
     @classmethod
     def couleur_adversaire(cls, couleur):
         """Retourne la couleur adverse:  "noir" si "blanc" et vice-versa."""
@@ -48,18 +57,19 @@ class Echiquier:
                               "h1": False,
                               "h8": False}
 
-        self.roques = {("e1", "c1"): ("grand roque", "blanc", "a1"), ("e1", "g1"): ("petit roque", "blanc", "h1"),
-                       ("e8", "c8"): ("grand roque", "noir", "a8"), ("e8", "g8"): ("petit roque", "noir", "h8")}
+
 
         # Variables d'état pour la prise en passant
-        self.pion_vient_de_sauter_une_case = {"a4": False, "a5": False,
-                                              "b4": False, "b5": False,
-                                              "c4": False, "c5": False,
-                                              "d4": False, "d5": False,
-                                              "e4": False, "e5": False,
-                                              "f4": False, "f5": False,
-                                              "g4": False, "g5": False,
-                                              "h4": False, "h5": False}
+        # self.pion_vient_de_sauter_une_case = {"a4": False, "a5": False,
+        #                                       "b4": False, "b5": False,
+        #                                       "c4": False, "c5": False,
+        #                                       "d4": False, "d5": False,
+        #                                       "e4": False, "e5": False,
+        #                                       "f4": False, "f5": False,
+        #                                       "g4": False, "g5": False,
+        #                                       "h4": False, "h5": False}
+        self.pion_vient_de_sauter_une_case = ""
+
 
         if not dictionnaire:
             self.initialiser_echiquier_depart()
@@ -91,14 +101,15 @@ class Echiquier:
             position_cible(str):  Arrivée du coup"""
 
         # Si un pion a sauté au coup avant le coup précédent, il ne vient plus de sauter
-        for position, vient_de_sauter in self.pion_vient_de_sauter_une_case.items():
-            if vient_de_sauter == True:
-                self.pion_vient_de_sauter_une_case[position] = False
+        self.pion_vient_de_sauter_une_case = ""
+
+        piece_deplacee = self.dictionnaire_pieces[position_source]
 
         # Si un pion a sauté: marquer qu'il vient de sauter
-        if position_cible in self.pion_vient_de_sauter_une_case.keys():
-            if isinstance(self.dictionnaire_pieces[position_source], Pion) and abs(ord(position_source[1]) - ord(position_cible[1])) == 2:
-                self.pion_vient_de_sauter_une_case[position_cible] = True
+        if position_cible in self.pion_peut_sauter_vers[piece_deplacee.couleur]:
+
+            if isinstance(piece_deplacee, Pion) and abs(ord(position_source[1]) - ord(position_cible[1])) == 2:
+                self.pion_vient_de_sauter_une_case = position_cible
 
     def recuperer_piece_a_position(self, position):
         """Retourne la pièce qui est située à une position particulière, reçue en argument. Si aucune pièce n'est
@@ -359,7 +370,7 @@ class Echiquier:
             return False
 
         # Ce pion doit venir de faire un saut!
-        if self.pion_vient_de_sauter_une_case[position_prise]:
+        if self.pion_vient_de_sauter_une_case == position_prise:
             return True
         else:
             raise PriseEnPassantNonAutoriseeException
