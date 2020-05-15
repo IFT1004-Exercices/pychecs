@@ -13,7 +13,7 @@ class Chronometre(Label):
         self.duree_affichee.set(self.texte_initial + f"{int(minutes):02d}:00")
         self.texte_alarme = alarme
         self.config(textvariable=self.duree_affichee)
-        self.marche=None
+        self.marche = None
 
         if not nobutton:
             self.bou = Button(master, text="Durée", command=self.debuter)

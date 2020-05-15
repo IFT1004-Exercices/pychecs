@@ -5,6 +5,11 @@ from pychecs2.interface.PychecsException import TourException
 from pychecs2.interface.AideContextuellePychecs import AIDE_CONTEXTUELLE
 from pychecs2.echecs.piece import Dame, Tour, Fou, Cavalier, Constructeur_de_piece
 
+
+########################################################################################################################
+# Objets graphiques utilisés pour gérer la promotion du pion
+########################################################################################################################
+
 class BoutonPiece(tk.Button):
     """Widget auxiliaire pour afficher des boutons avec un caractère de pièce dessus."""
 
@@ -44,7 +49,7 @@ class FenetreChoixPromotion(tk.Toplevel):
 
         # Les boutons et leurs handlers
         self.boutonDame = BoutonPiece(self.frameBouton, Dame(couleur))
-        self.boutonDame.configure(command= lambda : self.decider("D") )
+        self.boutonDame.configure(command=lambda: self.decider("D"))
 
         self.boutonTour = BoutonPiece(self.frameBouton, Tour(couleur))
         self.boutonTour.configure(command=lambda: self.decider("T"))
@@ -109,6 +114,10 @@ class FenetreChoixPromotion(tk.Toplevel):
         return self.code_piece_choisie.get()
 
 
+########################################################################################################################
+# Widget gérant l'interaction d'un échiquier avec le joueur par le biais de la souris
+########################################################################################################################
+
 class CanvasEchiquier(tk.Canvas, Echiquier):
     """Widget permettant d'afficher un échiquier et d'interagir avec, par le biais de la souris.
     Attributs:
@@ -153,8 +162,15 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
     case_arrivee(str):  Case arrivée du prochain coup
     """
 
-    def __init__(self, maitre = None, n_pixels_par_case = 50,
-                 dictionnaire = None, joueur_actif = None,
+    joueurs = {"blanc": "noir", "noir": "blanc"}
+    modes = {"actif": "attente", "attente": "actif"}
+
+    #############################################################################
+    # CONSTRUCTEUR
+    #############################################################################
+
+    def __init__(self, maitre=None, n_pixels_par_case=50,
+                 dictionnaire=None, joueur_actif=None,
                  option_chrono=False, option_aide=False,
                  **kwargs):
         """Constructeur:
@@ -177,7 +193,6 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
         # Variable contenant les messages à l'utilisateur et le statut de la partie, en cours ou gagnée
 
         self.message = tk.StringVar()
-        self.joueurs = {"blanc": "noir", "noir": "blanc"}
 
         if not joueur_actif:
             self.joueur_actif = "blanc"
@@ -186,38 +201,32 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
             self.joueur_actif = joueur_actif
             self.message.set(f"Au tour des {self.joueur_actif}s de jouer.")
 
+        ##########################
         # Le dernier coup complété
+        ##########################
+
         self.coup_joue = {}
 
+        ##############################################################
         # Compteur de coups.  Sera suivi dans le contrôleur de partie
+        ##############################################################
+
         self.nombre_de_coups_joues = tk.IntVar()
         self.nombre_de_coups_joues.set(0)
 
-        # True dès qu'un mouvement a été fait.  Suivi dans le contrôleur de partie
-        self.partie_modifiee = tk.BooleanVar()
-        self.partie_modifiee.set(False)
-
-        # True dès qu'un des rois devient mat, ou pat, ou en cas d'abandon.  Suivi dans ce module.
-        self.partie_terminee = tk.BooleanVar()
-        self.partie_terminee.set(False)
-        self.partie_terminee.trace_add("write", self.terminer_partie)
-
+        ####################################################
         # Semaphore avertissant le controleur d'un évènement
+        ####################################################
+
         self.evenement = tk.StringVar()
         self.evenement.set("debut")
 
-        # True dès que la partie sera terminée, mais non-nulle.
-        self.gagnee = False
-        self.couleur_gagnante = ""
+        self.exception = None
 
-        # Contenu de la bannière d'erreur.
-        self.message_erreur = tk.StringVar()
-        self.message_erreur.set("")
-
-        # Messages d'aide contextuelle, initialisés au message par défaut
-        self.message_aide_contextuelle = AIDE_CONTEXTUELLE["PychecsException"]
-
+        ##################################################
         # Paramètres géométriques du dessin de l'échiquier
+        ##################################################
+
         self.n_pixels_par_case = n_pixels_par_case
         self.taille_pieces = int(round(self.n_pixels_par_case * 60 / 100))
         self.n_lignes = 8
@@ -225,13 +234,19 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
         self.x_coin = 2 * self.n_pixels_par_case
         self.y_coin = 2 * self.n_pixels_par_case
 
+        ############################################################################################
         # Informations sur le mouvement demandé:  utilisé dans clic-souris pour la sélection du coup
+        ############################################################################################
+
         self.piece_selectionnee = False
         self.piece_a_deplacer = None
         self.case_depart = ""
         self.case_arrivee = ""
 
+        #######################################################################
         # Dessin initial de l'échiquier avec les pièces à leurs place de départ
+        #######################################################################
+
         self.dessiner_cases()
         self.dessiner_reperes()
         self.initialiser_canvas_depart()
@@ -248,8 +263,20 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
         # Options de jeu:  chronomètre et afficher les mouvements possibles
         self.option_chrono = option_chrono
         self.option_aide = option_aide
+
+        ##############################################################################
+        # Ce dict contient les cases surlignées pour indiquer les mouvements possibles
+        ##############################################################################
+
         self.cases_modifiees_pour_aider = {}
 
+    ####################################################################################################################
+    # FIN DU CONSTRUCTEUR
+    ####################################################################################################################
+
+    #######################################################################
+    # Interface avec le contrôleur
+    #######################################################################
 
     def passer_en_mode_actif(self):
         self.mode = "actif"
@@ -259,8 +286,28 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
         self.mode = "attente"
 
     def basculer_mode(self):
-        modes = {"actif": "attente", "attente": "actif"}
-        self.mode = modes[self.mode]
+        self.mode = self.modes[self.mode]
+
+    def joueur_inactif(self):
+        return self.joueurs[self.joueur_actif]
+
+    def basculer_joueur_actif(self):
+        """Bascule le joueur actif de blanc à noir et de noir à blanc."""
+        self.joueur_actif = self.joueur_inactif()
+
+    def activer(self, couleur):
+        """Méthode interface permettant au contrôleur d'imposer le joueur actif"""
+        self.joueur_actif = couleur
+
+    def dernier_coup(self):
+        return self.coup_joue
+
+    def reveler_exception(self):
+        return self.exception
+
+    ####################################################################################################################
+    # Dessin des pièces et des cases
+    ####################################################################################################################
 
     def initialiser_canvas_depart(self):
         """Initialiser le dictionnaire contenant les objets graphiques représentant les pièces sur l'échiquier.  Nous
@@ -288,10 +335,10 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
                     couleur = "white"
 
                 self.dictionnaire_cases[self.rangs_vers_position(colonne, ligne)] = self.create_rectangle(ulc_x,
-                                                                                                     ulc_y,
-                                                                                                     ulc_x + self.n_pixels_par_case,
-                                                                                                     ulc_y + self.n_pixels_par_case,
-                                                                                                     fill = couleur)
+                                                                                                          ulc_y,
+                                                                                                          ulc_x + self.n_pixels_par_case,
+                                                                                                          ulc_y + self.n_pixels_par_case,
+                                                                                                          fill=couleur)
 
     def dessiner_reperes(self):
         """Dessine les lettres et les chiffres autour de l'échiquier."""
@@ -300,18 +347,11 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
         for ligne in range(self.n_lignes):
             x = self.x_coin - offset
             y = self.y_coin + offset + ligne * self.n_pixels_par_case
-            self.create_text(x, y, font = ("default", -self.taille_pieces), text = self.chiffres_rangees[-1-ligne])
+            self.create_text(x, y, font=("default", -self.taille_pieces), text=self.chiffres_rangees[-1 - ligne])
         for colonne in range(self.n_colonnes):
             x = self.x_coin + offset + colonne * self.n_pixels_par_case
             y = self.y_coin + self.n_colonnes * self.n_pixels_par_case + offset
-            self.create_text(x, y, font=("default", -self.taille_pieces), text = self.lettres_colonnes[colonne])
-
-    def joueur_inactif(self):
-        return self.joueurs[self.joueur_actif]
-
-    def basculer_joueur_actif(self):
-        """Bascule le joueur actif de blanc à noir et de noir à blanc."""
-        self.joueur_actif = self.joueur_inactif()
+            self.create_text(x, y, font=("default", -self.taille_pieces), text=self.lettres_colonnes[colonne])
 
     def coordonnees_cases(self, position):
         """Pour une position donnée, retourne les coordonnées du coin supérieur gauche de la case.
@@ -325,8 +365,9 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
         Raises:
             AssertionError pour une position invalide."""
 
-        assert self.position_est_valide(position), self.message.set(f"Code de position non reconnu dans coordonnees_cases: {position}")
-        return ((ord(position[0]) - ord("a") ) * self.n_pixels_par_case + self.x_coin,
+        assert self.position_est_valide(position), self.message.set(
+            f"Code de position non reconnu dans coordonnees_cases: {position}")
+        return ((ord(position[0]) - ord("a")) * self.n_pixels_par_case + self.x_coin,
                 (self.n_lignes - int(position[1])) * self.n_pixels_par_case + self.y_coin)
 
     def coordonnees_centre_case(self, position):
@@ -338,7 +379,7 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
         Raises:
             AssertionError si la position en argument est invalide."""
 
-        x, y =  self.coordonnees_cases(position)
+        x, y = self.coordonnees_cases(position)
         offset = int(round(self.n_pixels_par_case / 2))
         return x + offset, y + offset
 
@@ -353,7 +394,7 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
             (int):  Le numéro d'identification du dessin de la pièce sur le canvas."""
 
         x, y = self.coordonnees_centre_case(position)
-        return self.create_text(x, y, text = str(piece), font = ("default", -self.taille_pieces), disabledfill="red")
+        return self.create_text(x, y, text=str(piece), font=("default", -self.taille_pieces), disabledfill="red")
 
     def coordonnees_est_dans_echiquier(self, x, y):
         """Retourne True si le point x, y est sur la surface de l'échiquier."""
@@ -378,6 +419,7 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
         raise ClicHorsEchiquierException
 
     def deplacer_de_case_a_case(self, position_source, position_cible):
+        """Efface une pièce de la case source et la dessine à la case cible."""
 
         # Calculer le déplacement à faire sur l'échiquier
         xinit, yinit = self.coordonnees_centre_case(position_source)
@@ -402,151 +444,6 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
         self.effacer_echiquier()
         self.initialiser_canvas_depart()
         self.update()
-
-    def deplacer(self, position_source, position_cible):
-        """Effectue un déplacement de pièce si celui-ci est permis, dans l'objet echiquier et sur le canvas.
-
-        Args:
-            position_source(str):  Case de départ
-            position_cible(str):  Case d'arrivée
-
-        Returns:
-            (bool):  True si le déplacement est valide et a été effectué, sinon False."""
-
-        # Vérifier et faire le déplacement dans la source de données
-        try:
-            coup = Echiquier.deplacer(self, position_source, position_cible)
-
-        # Déplacement impossible:  propager l'exception au contrôleur d'évenement
-        except PychecsException as erreur:
-            self.message_aide_contextuelle = erreur.message
-            raise erreur
-
-        # Sinon réfléter le changement au niveau graphique...
-        else:
-            # Si une prise est faite:  éliminer l'objet graphique du canvas et de la liste des objets dessinés
-            if position_cible in self.dictionnaire_graphique.keys():
-                self.effacer_la_piece_a_position(position_cible)
-
-            # Mettre à jour la liste graphique et faire le déplacement sur le canvas
-            self.deplacer_de_case_a_case(position_source, position_cible)
-            #self.dictionnaire_graphique[position_cible] = self.dictionnaire_graphique.pop(position_source)
-
-            # Si c'est un des roques, il faut aussi déplacer la tour.  Cela a été fait dans l'échiquier mais non avec
-            # les objets graphiques!
-            if "roque" in coup["special"]:
-                couleur = self.dictionnaire_pieces[position_cible].couleur
-                position_initiale, position_finale = self.parametres_du_roque(couleur, coup["special"])
-                self.deplacer_de_case_a_case(position_initiale, position_finale)
-                #self.dictionnaire_graphique[position_finale] = self.dictionnaire_graphique.pop(position_initiale)
-
-            # Si c'est une prise en passant, il faut éliminer un objet objet graphique pion à la case appropriée
-            if coup["special"] == "en passant":
-                position_prise = position_cible[0] + position_source[1]
-                if position_prise in self.dictionnaire_graphique.keys():
-                    self.effacer_la_piece_a_position(position_prise)
-
-            # Si c'est une promotion, il faut remplacer le pion promu par la pièce choisie
-            # Il faut aussi réévaluer si le roi est en échec, mat ou pat.
-            if coup["special"] == "promotion":
-                coup["special"] += self.promouvoir(position_cible)
-                coup["resultat"] = self.resultat_du_coup(self.joueur_inactif())
-
-            return coup
-
-    def code_de_promotion(self, piece):
-        codes = {"D": Dame, "T": Tour, "F": Fou, "C": Cavalier}
-        return codes[piece]
-
-    def promouvoir(self, position_cible):
-
-        if position_cible[1] == "8":
-            couleur = "blanc"
-        else:
-            couleur = "noir"
-        assert couleur == self.couleur_piece_a_position(position_cible), "Erreur dans promouvoir()"
-
-        code_piece_choisie = FenetreChoixPromotion(self, couleur).apparaitre()
-        assert code_piece_choisie in ["D", "T", "F", "C"]
-        self.dictionnaire_pieces[position_cible] = (self.code_de_promotion(code_piece_choisie))(couleur)
-        self.effacer_la_piece_a_position(position_cible)
-        self.dictionnaire_graphique[position_cible] = self.dessiner_piece(self.dictionnaire_pieces[position_cible], position_cible)
-        return code_piece_choisie
-
-    def case_depart_est_occupee(self, case):
-        """Vérifier si la case départ est occupée par une pièce de la couleur active, sinon lever une exception.
-
-        Args:
-            case(str):  Position à contrôler
-
-        Raises:
-            CaseDepartVideException si la case est inoccupée
-            TourException si la case est occupée par une pièce inactive."""
-
-        couleur_case_depart = self.couleur_piece_a_position(case)
-        if not couleur_case_depart:
-            raise CaseDepartVideException(case)
-        elif couleur_case_depart != self.joueur_actif:
-            raise TourException(self.joueur_actif)
-
-    def jouer_le_coup(self, case_depart, case_arrivee):
-
-        self.case_depart = case_depart
-        self.case_arrivee = case_arrivee
-        message_echec = ""
-
-        # Vérifier la légalité du déplacement et modifier le dictionnaire
-        try:
-            coup = self.deplacer(self.case_depart, self.case_arrivee)
-
-        # Si le déplacement demandé est impossible avertir l'utilisateur
-        except PychecsException as erreur:
-            self.message_erreur.set(str(erreur))
-            self.message_aide_contextuelle = erreur.message
-
-            # TODO: cette variable ne sert pas.  Eventuellement on pourrait inclure cette méthode dans clic-souris
-            caractere_piece_selectionnee = self.dictionnaire_graphique[self.case_depart]
-
-        # Si un déplacement a été fait, redessiner l'échiquier et basculer le joueur actif et vérifier si la
-        # partie est terminée!  Aussi effacer le message d'erreur, et enregistrer le coup joué.
-        # Vérifier si le roi adverse est en échec
-        else:
-            self.coup_joue = coup
-            self.nombre_de_coups_joues.set(self.nombre_de_coups_joues.get() + 1)
-
-            assert isinstance(self.coup_joue, dict), "Coup retourné n'est pas un dict"
-            assert "resultat" in self.coup_joue.keys()
-
-            if not self.partie_modifiee.get():
-                self.partie_modifiee.set(True)
-
-            # Échec et mat!  Quitter la fonction et terminer la partie
-            if self.coup_joue["resultat"] == "++":
-                self.gagnee = True
-                self.couleur_gagnante = self.joueur_actif
-                self.partie_terminee.set(True)
-                return
-
-            # Roi pat:  c'est une nulle.  La partie termine sans victoire ni gagnant.
-            elif (self.coup_joue["resultat"] == "pat"):
-                self.partie_terminee.set(True)
-
-            # Échec!  Avertir les joueurs
-            elif self.coup_joue["resultat"] == "+":
-                message_echec = "ÉCHEC!  "
-                self.message_aide_contextuelle = AIDE_CONTEXTUELLE["echec"]
-
-            else:
-                self.message_aide_contextuelle = AIDE_CONTEXTUELLE["PychecsException"]
-
-            # Passer au prochain joueur!
-            self.basculer_joueur_actif()
-            self.message_erreur.set("")
-            #self.message_aide_contextuelle = AIDE_CONTEXTUELLE["PychecsException"]
-            self.message.set(message_echec + f"C'est maintenant aux {self.joueur_actif}s à jouer!")
-
-            # MODIF:  Dans cette méthode on n'utilise pas le clic-souris donc cette variable ne sert pas
-            # caractere_piece_selectionnee = self.dictionnaire_graphique[self.case_arrivee]
 
     def selectionner_la_case(self, position):
         assert position in self.dictionnaire_cases.keys(), "Argument position erroné dans selectionner_la_case"
@@ -586,14 +483,15 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
         x, y = self.coordonnees_centre_case(position)
         rad = int(round(self.n_pixels_par_case * 0.45))
         if position not in self.cases_modifiees_pour_aider.keys():
-            self.cases_modifiees_pour_aider[position] = self.create_rectangle(x-rad, y-rad, x+rad, y+rad, outline=couleur, fill="")
+            self.cases_modifiees_pour_aider[position] = self.create_rectangle(x - rad, y - rad, x + rad, y + rad,
+                                                                              outline=couleur, fill="")
 
     def montrer_les_mouvements_possibles_a_partir_de(self, position):
         for destination, coup in self.mouvements_possibles_de_la_piece(position):
             self.modifier_la_case(destination, "blue")
 
     def cacher_les_mouvements_possibles_a_partir_de(self, position):
-        for destination,coup in self.mouvements_possibles_de_la_piece(position):
+        for destination, coup in self.mouvements_possibles_de_la_piece(position):
             self.deselectionner_la_case(destination)
 
     def montrer_tous_les_mouvements_possible_pour_la_couleur(self, couleur):
@@ -602,12 +500,145 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
             self.modifier_la_case(mouvement[0], "red")
             self.modifier_la_case(mouvement[1], "red")
 
-    def rearmer_les_selections(self, selection):
-        self.deselectionner_la_piece(selection)
+    def rearmer_les_selections(self, *selection):
+        for case in selection:
+            self.deselectionner_la_piece(case)
         self.deselectionner_la_case(self.case_depart)
         self.case_arrivee = ""
         self.case_depart = ""
         self.piece_a_deplacer = None
+
+    ####################################################################################################################
+    # Méthodes permettant de jouer des coups
+    ####################################################################################################################
+
+    def deplacer(self, position_source, position_cible):
+        """Effectue un déplacement de pièce si celui-ci est permis, dans l'objet echiquier et sur le canvas.
+
+        Args:
+            position_source(str):  Case de départ
+            position_cible(str):  Case d'arrivée
+
+        Returns:
+            (bool):  True si le déplacement est valide et a été effectué, sinon False."""
+
+        # Vérifier et faire le déplacement dans la source de données
+        try:
+            coup = Echiquier.deplacer(self, position_source, position_cible)
+
+        # Déplacement impossible:  propager l'exception au contrôleur d'évenement
+        except PychecsException as erreur:
+            raise erreur
+
+        # Sinon réfléter le changement au niveau graphique...
+        else:
+            # Si une prise est faite:  éliminer l'objet graphique du canvas et de la liste des objets dessinés
+            if position_cible in self.dictionnaire_graphique.keys():
+                self.effacer_la_piece_a_position(position_cible)
+
+            # Mettre à jour la liste graphique et faire le déplacement sur le canvas
+            self.deplacer_de_case_a_case(position_source, position_cible)
+
+            # Si c'est un des roques, il faut aussi déplacer la tour.  Cela a été fait dans l'échiquier mais non avec
+            # les objets graphiques!
+            if "roque" in coup["special"]:
+                couleur = self.dictionnaire_pieces[position_cible].couleur
+                position_initiale, position_finale = self.parametres_du_roque(couleur, coup["special"])
+                self.deplacer_de_case_a_case(position_initiale, position_finale)
+
+            # Si c'est une prise en passant, il faut éliminer un objet objet graphique pion à la case appropriée
+            if coup["special"] == "en passant":
+                position_prise = position_cible[0] + position_source[1]
+                if position_prise in self.dictionnaire_graphique.keys():
+                    self.effacer_la_piece_a_position(position_prise)
+
+            # Si c'est une promotion, il faut remplacer le pion promu par la pièce choisie
+            # Il faut aussi réévaluer si le roi est en échec, mat ou pat.
+            if coup["special"] == "promotion":
+                coup["special"] += self.promouvoir(position_cible)
+                coup["resultat"] = self.resultat_du_coup(self.joueur_inactif())
+
+            return coup
+
+    @staticmethod
+    def code_de_promotion(self, piece):
+        codes = {"D": Dame, "T": Tour, "F": Fou, "C": Cavalier}
+        return codes[piece]
+
+    def promouvoir(self, position_cible):
+
+        if position_cible[1] == "8":
+            couleur = "blanc"
+        else:
+            couleur = "noir"
+        assert couleur == self.couleur_piece_a_position(position_cible), "Erreur dans promouvoir()"
+
+        code_piece_choisie = FenetreChoixPromotion(self, couleur).apparaitre()
+        assert code_piece_choisie in ["D", "T", "F", "C"]
+        self.dictionnaire_pieces[position_cible] = (self.code_de_promotion(code_piece_choisie))(couleur)
+        self.effacer_la_piece_a_position(position_cible)
+        self.dictionnaire_graphique[position_cible] = self.dessiner_piece(self.dictionnaire_pieces[position_cible],
+                                                                          position_cible)
+        return code_piece_choisie
+
+    def case_depart_est_occupee(self, case):
+        """Vérifier si la case départ est occupée par une pièce de la couleur active, sinon lever une exception.
+
+        Args:
+            case(str):  Position à contrôler
+
+        Raises:
+            CaseDepartVideException si la case est inoccupée
+            TourException si la case est occupée par une pièce inactive."""
+
+        couleur_case_depart = self.couleur_piece_a_position(case)
+        if not couleur_case_depart:
+            raise CaseDepartVideException(case)
+        elif couleur_case_depart != self.joueur_actif:
+            raise TourException(self.joueur_actif)
+
+    def jouer_le_coup(self, case_depart, case_arrivee):
+
+        self.case_depart = case_depart
+        self.case_arrivee = case_arrivee
+        message_echec = ""
+
+        # Vérifier la légalité du déplacement et modifier le dictionnaire
+        try:
+            coup = self.deplacer(self.case_depart, self.case_arrivee)
+
+        # Si le déplacement demandé est impossible avertir l'utilisateur
+        except PychecsException as erreur:
+            # self.message_erreur.set(str(erreur))
+            # self.message_aide_contextuelle = erreur.message
+            self.exception = erreur
+
+        # Si un déplacement a été fait, redessiner l'échiquier et basculer le joueur actif et vérifier si la
+        # partie est terminée!  Aussi effacer le message d'erreur, et enregistrer le coup joué.
+        # Vérifier si le roi adverse est en échec
+        else:
+            self.coup_joue = coup
+            self.nombre_de_coups_joues.set(self.nombre_de_coups_joues.get() + 1)
+
+            assert isinstance(self.coup_joue, dict), "Coup retourné n'est pas un dict"
+            assert "resultat" in self.coup_joue.keys()
+
+            # Échec et mat!  Quitter la fonction et terminer la partie
+            if self.coup_joue["resultat"] == "++":
+                return
+
+            # Échec!  Avertir les joueurs
+            elif self.coup_joue["resultat"] == "+":
+                message_echec = "ÉCHEC!  "
+                self.message_aide_contextuelle = AIDE_CONTEXTUELLE["echec"]
+
+            else:
+                self.message_aide_contextuelle = AIDE_CONTEXTUELLE["PychecsException"]
+
+            # Passer au prochain joueur!
+            self.basculer_joueur_actif()
+            self.message_erreur.set("")
+            self.message.set(message_echec + f"C'est maintenant aux {self.joueur_actif}s à jouer!")
 
     def clic_souris(self, event):
         """Le coeur de cette classe.  C'est le handler des clics de souris, responsable des interactions avec les
@@ -621,19 +652,15 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
         if self.mode == "attente":
             return
 
-        # La partie terminée:  le canvas ne répond plus à la souris.
-        if self.partie_terminee.get():
-            self.message_erreur.set("Pour sortir ou recommencer, appuyez sur le bouton Quitter")
-            self.message_aide_contextuelle = AIDE_CONTEXTUELLE["PychecsException"]
-            return
+        # Avertir le contrôleur qu'un clic de souris a été fait
+        self.evenement.set("clic")
 
         # Identifier la case qui est cliquée.  Sortir si l'utilisateur a cliqué hors de l'échiquier.
-        message_echec = ""
         try:
             case = self.coordonnees_vers_position(event.x, event.y)
         except ClicHorsEchiquierException as erreur:
-            self.message_erreur.set(str(erreur))
-            self.message_aide_contextuelle = erreur.message
+            self.exception = erreur
+            self.evenement.set("erreur")
             return
 
         # Si une pièce est déjà sélectionnée, il faut une case arrivée
@@ -641,10 +668,7 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
 
             # Annuler le coup si le joueur a recliqué la case départ et désélectionner la pièce la couleur de départ
             if case == self.case_depart:
-                self.deselectionner_la_piece(self.case_depart)
-                self.deselectionner_la_case(self.case_depart)
-                self.piece_a_deplacer = None
-                self.case_depart = ""
+                self.rearmer_les_selections(self.case_depart)
 
             # Assigner la case arrivée et demander à l'échiquier de faire le déplacement.  Réarmer la sélection.
             else:
@@ -657,63 +681,18 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
                 # Si le déplacement demandé est impossible avertir l'utilisateur
                 # La variable coup_valide indique si un coup a été joué auquel cas il faut réarmer la case
                 except PychecsException as erreur:
-                    self.message_erreur.set(str(erreur))
-                    self.message_aide_contextuelle = erreur.message
-                    coup_valide = False
+                    self.exception = erreur
+                    self.evenement.set("erreur")
+                    self.rearmer_les_selections(self.case_depart)
 
-                # Si un déplacement a été fait, redessiner l'échiquier et basculer le joueur actif et vérifier si la
-                # partie est terminée!  Aussi effacer le message d'erreur, et enregistrer le coup joué.
-                # Vérifier si le roi adverse est en échec
+                # Si un déplacement a été fait, avertir le contrôleur avec la variable nombre_de_coups_joues.
+                # Aussi effacer le message d'erreur, et enregistrer le coup joué.
+
                 else:
                     self.coup_joue = coup
-                    coup_valide = True
-                    # TODO attention il y a un os ici
-                    # On va déplacer cette ligne plus bas pur réarmer les sélections avant d'appeler le joueur adverse
-                    #self.nombre_de_coups_joues.set(self.nombre_de_coups_joues.get() + 1)
-
-                    assert isinstance(self.coup_joue, dict), "Coup retourné n'est pas un dict"
-                    assert "resultat" in self.coup_joue.keys()
-
-                    if not self.partie_modifiee.get():
-                        self.partie_modifiee.set(True)
-
-                    # Échec et mat!  Quitter la fonction et terminer la partie
-                    if self.coup_joue["resultat"] == "++":
-                        self.gagnee = True
-                        self.couleur_gagnante = self.joueur_actif
-                        self.partie_terminee.set(True)
-                        self.rearmer_les_selections(self.case_arrivee)
-                        self.basculer_joueur_actif()
-                        self.nombre_de_coups_joues.set(self.nombre_de_coups_joues.get() + 1)
-                        return
-
-                    # Roi pat:  c'est une nulle.  La partie termine sans victoire ni gagnant.
-                    elif (self.coup_joue["resultat"] == "pat"):
-                        self.partie_terminee.set(True)
-                        self.rearmer_les_selections(self.case_arrivee)
-                        self.basculer_joueur_actif()
-                        self.nombre_de_coups_joues.set(self.nombre_de_coups_joues.get() + 1)
-                        return
-
-                    # Échec!  Avertir les joueurs
-                    elif self.coup_joue["resultat"] == "+":
-                        message_echec = "ÉCHEC!  "
-                        self.message_aide_contextuelle = AIDE_CONTEXTUELLE["echec"]
-
-                    else:
-                        self.message_aide_contextuelle = AIDE_CONTEXTUELLE["PychecsException"]
-
-                    # Passer au prochain joueur!
-                    self.basculer_joueur_actif()
-                    self.message_erreur.set("")
-                    #self.message_aide_contextuelle = AIDE_CONTEXTUELLE["PychecsException"]
-                    self.message.set(message_echec + f"C'est maintenant aux {self.joueur_actif}s à jouer!")
-                    self.rearmer_les_selections(self.case_arrivee)
                     self.nombre_de_coups_joues.set(self.nombre_de_coups_joues.get() + 1)
+                    self.rearmer_les_selections(self.case_arrivee)
 
-                # Réarmer les sélections qu'un déplacement ait ou non eu lieu
-                if not coup_valide:
-                    self.rearmer_les_selections(self.case_depart)
 
         # Pas de pièce déjà sélectionnée...
         else:
@@ -724,8 +703,8 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
 
             # Sinon lever l'exception et aviser l'utilisateur
             except PychecsException as erreur:
-                self.message_erreur.set(str(erreur))
-                self.message_aide_contextuelle = erreur.message
+                self.exception = erreur
+                self.evenement.set("erreur")
 
             # Une pièce de la couleur active a été cliquée, la sélectionner.
             else:
@@ -768,42 +747,16 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
             # Remettre à jour l'échiquier graphique d'après l'échiquier logique
             self.mise_a_jour_echiquier()
 
-        # Rebasculer le joueur actif et les autres variables d'état: la partie ne peut plus être ni gagnée, ni terminée...
-        if self.partie_terminee.get():
-            self.partie_terminee.set("False")
-            self.evenement.set("reactiver")
-        if self.gagnee:
-            self.gagnee = "False"
-        self.basculer_joueur_actif()
-        self.coup_joue = ""
-        self.couleur_gagnante = ""
-        self.message.set(f"C'est maintenant au tour des {self.joueur_actif}s à jouer!")
-        if self.roi_de_couleur_est_en_echec(self.joueur_actif):
-            self.message.set(f"ÉCHEC! C'est au tour des {self.joueur_actif} à jouer!")
-            self.message_aide_contextuelle = AIDE_CONTEXTUELLE["echec"]
-        self.message_erreur.set("")
-        self.message_aide_contextuelle = AIDE_CONTEXTUELLE["PychecsException"]
-
         # Ensuite il faut remettre à jour les permissions de prise en passant et du roque, sauf si on est au premier
-        # coup.  Dans ce cas on est certain qu'elles n'ont pas changé.
-        if not avant_dernier_coup is None:
-            print("avant-dernier ", avant_dernier_coup)
+        # coup.  Dans ce cas on est certain qu'elles n'ont pas changé.  L'avant-dernier coup devient le coup joué.
+        if avant_dernier_coup is not None:
+            self.coup_joue = avant_dernier_coup
             self.pion_vient_de_sauter_une_case = avant_dernier_coup["pion a saute"]
             self.piece_a_bouge = avant_dernier_coup["piece a bouge"]
-
-        # Annuler toute sélection précédente
-        self.piece_selectionnee = False
-        self.piece_a_deplacer = None
-        self.case_depart = ""
-        self.case_arrivee = ""
-
-    def terminer_partie(self, *args):
-        self.evenement.set("fin")
-        if self.couleur_gagnante == "":
-            self.message.set(f"Partie nulle: un roi est pat!")
         else:
-            self.message.set(f"Les {self.couleur_gagnante}s ont gagné!")
-
+            self.coup_joue = None
+            self.pion_vient_de_sauter_une_case = ""
+            self.piece_a_bouge = ""
 
     def __repr__(self):
         return Echiquier.__repr__(self)
@@ -816,7 +769,6 @@ if __name__ == "__main__":
     print(code)
     root.mainloop()
 
-
     while True:
         pass
 
@@ -824,15 +776,15 @@ if __name__ == "__main__":
     fenetre = tk.Tk()
 
     # Création de l'échiquier
-    objet = CanvasEchiquier(fenetre, width = 1000, height = 600)
+    objet = CanvasEchiquier(fenetre, width=1000, height=600)
 
     # Création d'un label pour les messages à l'utilisateur
-    billboard = tk.Label(fenetre, textvariable = objet.message)
-    errorboard = tk.Label(fenetre, textvariable = objet.message_erreur)
+    billboard = tk.Label(fenetre, textvariable=objet.message)
+    errorboard = tk.Label(fenetre, textvariable=objet.message_erreur)
     coupBoard = tk.Label(fenetre, textvariable=objet.coup_joue)
 
     # Placer les objets et commencer...
-    billboard.pack(side = tk.TOP)
+    billboard.pack(side=tk.TOP)
     errorboard.pack()
     coupBoard.pack()
     objet.pack()
