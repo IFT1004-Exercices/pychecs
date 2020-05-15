@@ -249,7 +249,7 @@ class ControleurDePartie(Toplevel):
         ##############################################################
 
         if self.etat_partie["chrono"]:
-            self.chrono = Chronometre(self.cadre_messages, minutes=self.etat_partie["option_chrono"], alarme="00:00",
+            self.chrono = Chronometre(self.cadre_messages, minutes=self.etat_partie["chrono"], alarme="00:00",
                                       width=4, fg="black", bg="light grey",
                                       font=("default", 25, "normal"))
 
@@ -574,6 +574,7 @@ class ControleurDePartie(Toplevel):
         texte = prefixe + f"C'est au tour des {self.etat_partie['joueur actif']}s à jouer."
         self.message.set(texte)
 
+
     def un_coup_est_joue(self, *args):
 
         # On paralyse l'échiquier pendant qu'on traite le coup
@@ -603,6 +604,10 @@ class ControleurDePartie(Toplevel):
         # La partie est modifiée, donc il faudra offrir de sauvegarder si on interrompt
         self.etat_sauvegardee_change()
 
+        # Si la partie était terminée, elle ne l'est plus...
+        if self.etat_partie["etat"] == "terminee":
+            self.etat_partie["etat"] = "en cours"
+
         self.affichage_de_la_liste_des_coups()
         self.basculer_joueur_actif()
         self.mise_a_jour_des_messages()
@@ -628,8 +633,15 @@ class ControleurDePartie(Toplevel):
     def quitter_la_partie(self):
         """Quitter le controleur de partie. Il faut passer la main au widget de bienvenue."""
 
-        self.destroy()
-        self.master.bienvenue_apparait()
+        reponse = messagebox.askyesno(title = "Quitter",
+                                      message="Êtes-vous certain de vouloir quitter?",
+                                      default=messagebox.NO,
+                                      parent=self)
+        if reponse:
+            self.destroy()
+            self.master.bienvenue_apparait()
+        else:
+            return
 
     def verifier_abandon(self):
         """L"utilisateur a arrêté la partie, vérifier s'il veut abandonner car cette action est irréversible."""
@@ -639,7 +651,7 @@ class ControleurDePartie(Toplevel):
         confirme_abandon = messagebox.askyesnocancel(title="Abandon?",
                                                      message=message,
                                                      default=messagebox.NO,
-                                                     parent=self.echiquier_graphique)
+                                                     parent=self)
 
         # Si l'utilisateur abandonne:  la partie est gagnée par l'adversaire et donc terminée
         if confirme_abandon is None:
@@ -661,6 +673,10 @@ class ControleurDePartie(Toplevel):
          automatiquement une partie nulle."""
 
         self.etat_partie["etat"] = "terminee"
+
+        # Nécessaire si on désire annuler un coup par la suite, pour conserver la bonne alternance
+        self.basculer_joueur_actif()
+
         if self.etat_partie["chrono"]:
             self.repartir_le_chrono()
 
@@ -678,7 +694,8 @@ class ControleurDePartie(Toplevel):
             self.etat_partie["gagnant"] = {"blanc": "noir", "noir": "blanc"}[self.etat_partie["joueur actif"]]
             self.message.set(f"Les {self.etat_partie['gagnant']} gagnent par abandon!")
 
-        self.mise_a_jour_des_messages()
+         # Forcer la bannière à se mettre à jour...
+        self.update_idletasks()
 
         # Si la partie a été modifiée depuis la dernière sauvegarde, proposer de sauvegarder.
         if not self.etat_partie["sauvegardee"]:
@@ -691,14 +708,7 @@ class ControleurDePartie(Toplevel):
             # L'utilisateur a sauvegardé ou choisi de ne pas sauvegarder
             self.etat_partie["sauvegardee"] = True
 
-        # Dernière chance de se rattraper...
-        message = "Quitter la partie?"
-        reponse = messagebox.askyesno(title="Quitter?",
-                                      message=message,
-                                      default=messagebox.NO,
-                                      parent=self)
-        if reponse:
-            self.quitter_la_partie()
+        self.quitter_la_partie()
         return
 
     ########################################################
@@ -734,6 +744,7 @@ class ControleurDePartie(Toplevel):
 
         # Afficher la ListeDeroulante avec les données à jour
         self.registre_coups.update(self.lignes_registre_coups)
+        self.update_idletasks()
 
     def generer_liste_des_prises(self):
         """Retourne la lise des pièces prises"""
@@ -796,8 +807,8 @@ class ControleurDePartie(Toplevel):
 
         confirme_enregistrer = messagebox.askyesnocancel(title="Sauvegarde de la partie",
                                                          message=message,
-                                                         default=messagebox.YES,
-                                                         parent=self)
+                                                         parent=self, 
+                                                         default=messagebox.YES)
 
         # Si oui, repérer le fichier sauvegarde.  Proposer initialement un fichier sauvegarde déjà employé, ou alors le
         # fichier par défaut.
@@ -827,34 +838,9 @@ class ControleurDePartie(Toplevel):
             reponse = self.verifier_abandon()
             if reponse:
                 self.partie_est_finie()
-            elif reponse is None:
-                return
-
-        # Si la partie a été modifiée depuis la dernière sauvegarde, proposer de sauvegarder.
-        if not self.etat_partie["sauvegardee"]:
-            resultat = self.utilisateur_sauve_la_partie()
-
-            # L'utilisateur a annulé la sauvegarde, on retourne
-            if resultat is None:
-                return
-
-            # L'utilisateur a sauvegardé ou a choisi de ne pas sauvegarder
-            self.etat_partie["sauvegardee"] = resultat
-
-        # Dernière chance de se rattraper...
-        if self.etat_partie["sauvegardee"]:
-            message = "La partie a été sauvegardée.  Êtes-vous certain de vouloir quitter la partie?"
-        else:
-            message = "Êtes-vous certain de vouloir quitter la partie?"
-        reponse = messagebox.askyesnocancel(title="Quitter",
-                                            message=message,
-                                            default=messagebox.NO,
-                                            parent=self,
-                                            icon="error")
-        if reponse:
-            #self.quitter_la_partie()
-            pass
-        return
+            else:
+                self.utilisateur_sauve_la_partie()
+                self.quitter_la_partie()
 
     def bouton_sauvegarder_presse(self):
         """Va demander un fichier sauvegarde à l'utilisateur"""
@@ -864,6 +850,7 @@ class ControleurDePartie(Toplevel):
                 nom = filedialog.asksaveasfilename(title="Veuillez choisir un fichier de sauvegarde",
                                                    initialfile=self.etat_partie["fichier"],
                                                    initialdir=getcwd(),
+                                                   parent=self,
                                                    filetypes=[("Pychecs files", ".pychecs")])
                 if not nom:
                     return False
@@ -894,7 +881,7 @@ class ControleurDePartie(Toplevel):
         """Afficher l'aide contextuelle"""
 
         messagebox.showinfo(title="Aide Pychecs",
-                            message=self.echiquier_graphique.message_aide_contextuelle,
+                            message=self.aide_contextuelle,
                             parent=self)
 
 ############################################################

@@ -689,9 +689,10 @@ class CanvasEchiquier(tk.Canvas, Echiquier):
                 # Aussi effacer le message d'erreur, et enregistrer le coup joué.
 
                 else:
+                    self.rearmer_les_selections(self.case_arrivee)
                     self.coup_joue = coup
                     self.nombre_de_coups_joues.set(self.nombre_de_coups_joues.get() + 1)
-                    self.rearmer_les_selections(self.case_arrivee)
+
 
 
         # Pas de pièce déjà sélectionnée...
